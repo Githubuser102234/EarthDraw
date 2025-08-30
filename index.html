@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Drawing Map</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+        }
+
+        #map-container {
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 120px);
+            border-radius: 0.75rem;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 0.75rem;
+        }
+
+        #drawing-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1000;
+        }
+
+        .leaflet-container {
+            background-color: transparent !important;
+        }
+
+        .control-panel {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            padding: 1rem;
+            margin-top: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .tool-button, .action-button, .mode-button {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1.25rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+
+        .tool-button.active {
+            box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+            transform: scale(0.98);
+        }
+
+        #user-info img {
+            border-radius: 9999px;
+            width: 32px;
+            height: 32px;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 p-4 min-h-screen flex flex-col items-center">
+
+    <div class="max-w-4xl w-full mx-auto">
+        <header class="text-center my-4">
+            <h1 class="text-3xl font-bold text-gray-800">Interactive Drawing Map</h1>
+            <p class="text-gray-600 mt-2">Draw, save, and share your creations on the map.</p>
+        </header>
+
+        <!-- Login and App UI -->
+        <div id="auth-container" class="flex flex-col items-center justify-center bg-white p-8 rounded-xl shadow-lg transition-all duration-300">
+            <p class="text-lg text-gray-700 font-semibold mb-4">Please sign in to start drawing.</p>
+            <button id="google-signin-button" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors">
+                <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21.002 10.25c.071.536.113 1.077.113 1.625 0 2.214-.658 4.288-1.928 5.864l-1.42-1.27c.805-1.047 1.272-2.39 1.272-3.662 0-.306-.027-.61-.077-.912H12.002v3.468h4.591c-.247 1.133-.873 2.112-1.803 2.766l1.247 1.054c1.174-.89 2.072-2.222 2.585-3.792C20.67 15.65 21.002 13.987 21.002 12.25c0-.668-.094-1.32-.236-1.932zM12.002 21.996c2.973 0 5.485-1.01 7.245-2.735l-1.247-1.054c-1.096.827-2.5 1.34-3.998 1.34-3.486 0-6.44-2.316-7.49-5.467h-3.94l-.001.001 1.487 3.655C6.44 19.845 8.956 21.996 12.002 21.996zM4.53 13.99c-.198-.53-.306-1.1-.306-1.69s.108-1.16.306-1.69L3.045 7.64c-.456.966-.715 2.064-.715 3.25s.259 2.284.715 3.25l1.485 3.65zM12.002 5.04c2.083 0 3.966.85 5.295 2.24l-1.745 1.54c-.933-.89-2.164-1.432-3.55-1.432-1.066 0-2.052.282-2.898.795l-1.474-3.66c1.238-.97 2.744-1.583 4.417-1.583z"/>
+                </svg>
+                <span>Sign In with Google</span>
+            </button>
+        </div>
+
+        <div id="main-app" class="hidden">
+            <div id="map-container">
+                <div id="map"></div>
+                <canvas id="drawing-canvas"></canvas>
+            </div>
+
+            <div class="control-panel flex flex-col md:flex-row items-center justify-between mt-4 space-y-4 md:space-y-0 md:space-x-4">
+                <!-- Drawing Tools -->
+                <div id="drawing-tools" class="flex items-center space-x-2">
+                    <button id="draw-tool" class="tool-button bg-blue-500 text-white hover:bg-blue-600 active">Draw</button>
+                    <input type="color" id="color-picker" class="w-10 h-10 p-1 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex items-center space-x-2">
+                    <button id="toggle-mode-button" class="mode-button bg-gray-500 text-white hover:bg-gray-600">Toggle View Mode</button>
+                    <button id="clear-button" class="action-button bg-red-500 text-white hover:bg-red-600">Clear</button>
+                    <button id="save-button" class="action-button bg-green-500 text-white hover:bg-green-600">Save Drawing</button>
+                </div>
+            </div>
+
+            <!-- User Info and Status -->
+            <div class="bg-white p-4 rounded-xl mt-4 text-sm text-gray-700 shadow-lg flex items-center justify-between">
+                <div id="user-info" class="flex items-center space-x-2">
+                    <img id="user-photo" class="rounded-full" src="" alt="User Photo" onerror="this.src='https://placehold.co/32x32/E5E7EB/4B5563?text=user'">
+                    <span id="user-name" class="font-semibold text-gray-800"></span>
+                </div>
+                <button id="sign-out-button" class="bg-gray-200 text-gray-700 px-3 py-1 rounded-full text-xs font-semibold hover:bg-gray-300 transition-colors">Sign Out</button>
+            </div>
+            <div class="bg-white p-4 rounded-xl mt-2 text-sm text-gray-700 shadow-lg">
+                <p id="status-message" class="font-semibold"></p>
+                <p class="mt-2">Your User ID: <span id="user-id" class="font-mono bg-gray-200 px-2 py-1 rounded">Loading...</span></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <!-- Firebase JS -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Set log level for debugging Firestore issues
+        setLogLevel('debug');
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDn8MsNDYmDs27KCQqAmpAXo5zgGUv4Sjk",
+            authDomain: "earthdraw-33c87.firebaseapp.com",
+            projectId: "earthdraw-33c87",
+            storageBucket: "earthdraw-33c87.firebasestorage.app",
+            messagingSenderId: "203683394694",
+            appId: "1:203683394694:web:95bec4420988a52c2b8d07",
+            measurementId: "G-26GXSJGJSP"
+        };
+        const appId = "earthdraw-33c87"; // Using projectId as the app ID for firestore rules
+
+        // --- Firebase Initialization and Auth ---
+        let db, auth, userId;
+        const statusMessageEl = document.getElementById('status-message');
+        const userIdEl = document.getElementById('user-id');
+        const authContainer = document.getElementById('auth-container');
+        const mainApp = document.getElementById('main-app');
+        const googleSignInButton = document.getElementById('google-signin-button');
+        const signOutButton = document.getElementById('sign-out-button');
+        const userNameEl = document.getElementById('user-name');
+        const userPhotoEl = document.getElementById('user-photo');
+
+        const initFirebase = () => {
+            try {
+                const app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+                setupAuthListeners();
+            } catch (error) {
+                statusMessageEl.textContent = `Firebase init failed: ${error.message}`;
+                console.error("Firebase init failed:", error);
+            }
+        };
+
+        const setupAuthListeners = () => {
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    userId = user.uid;
+                    userIdEl.textContent = userId;
+                    userNameEl.textContent = user.displayName || 'Anonymous User';
+                    userPhotoEl.src = user.photoURL || 'https://placehold.co/32x32/E5E7EB/4B5563?text=user';
+                    authContainer.classList.add('hidden');
+                    mainApp.classList.remove('hidden');
+                    statusMessageEl.textContent = 'Signed in successfully. Happy drawing!';
+                    loadDrawings();
+                } else {
+                    userId = null;
+                    authContainer.classList.remove('hidden');
+                    mainApp.classList.add('hidden');
+                    statusMessageEl.textContent = 'Please sign in to continue.';
+                }
+            });
+        };
+
+        googleSignInButton.addEventListener('click', async () => {
+            const provider = new GoogleAuthProvider();
+            try {
+                await signInWithPopup(auth, provider);
+            } catch (error) {
+                console.error("Google Sign-In failed:", error);
+                statusMessageEl.textContent = `Sign-in failed: ${error.message}`;
+            }
+        });
+
+        signOutButton.addEventListener('click', async () => {
+            try {
+                await signOut(auth);
+                statusMessageEl.textContent = 'Signed out.';
+            } catch (error) {
+                console.error("Sign-out failed:", error);
+                statusMessageEl.textContent = `Sign-out failed: ${error.message}`;
+            }
+        });
+
+        // --- Map Initialization ---
+        const map = L.map('map').setView([40.7128, -74.0060], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        const canvas = document.getElementById('drawing-canvas');
+        const ctx = canvas.getContext('2d');
+        const drawingToolsEl = document.getElementById('drawing-tools');
+        let isDrawingMode = true;
+        let isDrawing = false;
+        let points = [];
+        let color = '#3b82f6';
+
+        const resizeCanvas = () => {
+            const mapContainer = document.getElementById('map-container');
+            canvas.width = mapContainer.clientWidth;
+            canvas.height = mapContainer.clientHeight;
+        };
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Drawing and Viewing Logic ---
+        const getPoint = (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const clientX = event.clientX || event.touches[0].clientX;
+            const clientY = event.clientY || event.touches[0].clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        };
+
+        const startDrawing = (event) => {
+            if (!isDrawingMode || !userId) return;
+            event.preventDefault();
+            isDrawing = true;
+            points = [];
+            const point = getPoint(event);
+            const latLng = map.containerPointToLatLng([point.x, point.y]);
+            points.push({ lat: latLng.lat, lng: latLng.lng });
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            ctx.moveTo(point.x, point.y);
+        };
+
+        const draw = (event) => {
+            if (!isDrawing || !isDrawingMode) return;
+            const point = getPoint(event);
+            const latLng = map.containerPointToLatLng([point.x, point.y]);
+            points.push({ lat: latLng.lat, lng: latLng.lng });
+            ctx.lineTo(point.x, point.y);
+            ctx.stroke();
+        };
+
+        const endDrawing = () => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            ctx.closePath();
+            if (points.length < 5) {
+                clearLocalCanvas();
+                return;
+            }
+        };
+
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mouseup', endDrawing);
+        canvas.addEventListener('mouseout', endDrawing);
+        canvas.addEventListener('mousemove', draw);
+
+        canvas.addEventListener('touchstart', startDrawing);
+        canvas.addEventListener('touchend', endDrawing);
+        canvas.addEventListener('touchcancel', endDrawing);
+        canvas.addEventListener('touchmove', draw);
+
+        // --- UI Element Event Listeners ---
+        document.getElementById('color-picker').addEventListener('input', (e) => {
+            color = e.target.value;
+        });
+
+        document.getElementById('clear-button').addEventListener('click', () => {
+            clearLocalCanvas();
+            statusMessageEl.textContent = 'Canvas cleared.';
+        });
+
+        document.getElementById('save-button').addEventListener('click', async () => {
+            if (points.length === 0) {
+                statusMessageEl.textContent = 'Draw something before saving!';
+                return;
+            }
+            if (!userId) {
+                statusMessageEl.textContent = 'You must be signed in to save.';
+                return;
+            }
+
+            statusMessageEl.textContent = 'Saving drawing...';
+            const drawingData = {
+                points: JSON.stringify(points),
+                color: color,
+                createdAt: new Date()
+            };
+
+            try {
+                await addDoc(collection(db, `artifacts/${appId}/users/${userId}/drawings`), drawingData);
+                statusMessageEl.textContent = 'Drawing saved successfully!';
+                clearLocalCanvas();
+            } catch (e) {
+                console.error("Error saving document: ", e);
+                statusMessageEl.textContent = 'Error saving drawing. See console for details.';
+            }
+        });
+
+        document.getElementById('toggle-mode-button').addEventListener('click', () => {
+            isDrawingMode = !isDrawingMode;
+            if (isDrawingMode) {
+                drawingToolsEl.classList.remove('hidden');
+                document.getElementById('toggle-mode-button').textContent = 'Toggle View Mode';
+                statusMessageEl.textContent = 'Drawing mode enabled. You can now draw on the map.';
+            } else {
+                drawingToolsEl.classList.add('hidden');
+                document.getElementById('toggle-mode-button').textContent = 'Toggle Draw Mode';
+                statusMessageEl.textContent = 'Viewing mode enabled. Pan and zoom freely.';
+            }
+        });
+
+        // --- Canvas and Firestore Sync ---
+        const clearLocalCanvas = () => {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            points = [];
+        };
+
+        const renderDrawing = (drawing) => {
+            try {
+                const drawingPoints = JSON.parse(drawing.points);
+                if (drawingPoints.length === 0) return;
+                ctx.strokeStyle = drawing.color;
+                ctx.lineWidth = 4;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.beginPath();
+                const startPoint = map.latLngToContainerPoint([drawingPoints[0].lat, drawingPoints[0].lng]);
+                ctx.moveTo(startPoint.x, startPoint.y);
+
+                for (let i = 1; i < drawingPoints.length; i++) {
+                    const nextPoint = map.latLngToContainerPoint([drawingPoints[i].lat, drawingPoints[i].lng]);
+                    ctx.lineTo(nextPoint.x, nextPoint.y);
+                }
+                ctx.stroke();
+            } catch (e) {
+                console.error("Error rendering drawing: ", e);
+            }
+        };
+
+        const loadDrawings = () => {
+            if (!db || !userId) {
+                statusMessageEl.textContent = 'Waiting for user authentication...';
+                return;
+            }
+
+            const q = query(collection(db, `artifacts/${appId}/users/${userId}/drawings`));
+            onSnapshot(q, (querySnapshot) => {
+                clearLocalCanvas();
+                querySnapshot.forEach((doc) => {
+                    const drawing = doc.data();
+                    renderDrawing(drawing);
+                });
+            }, (error) => {
+                console.error("Error getting documents:", error);
+                statusMessageEl.textContent = 'Error fetching drawings from Firestore.';
+            });
+        };
+
+        map.on('moveend', () => {
+            if (userId) {
+                loadDrawings();
+            }
+        });
+
+        // --- Start App ---
+        window.onload = initFirebase;
+    </script>
+</body>
+</html>
