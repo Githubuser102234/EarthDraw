@@ -222,7 +222,7 @@
     <script type="module">
         // Import all necessary Firebase SDKs with the correct version
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, deleteDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -239,10 +239,8 @@
             appId: "1:203683394694:web:95bec4420988a52c2b8d07",
             measurementId: "G-26GXSJGJSP"
         };
-
-        // Initialize variables that will hold Firebase service instances
-        let db, auth, userId;
         const appId = firebaseConfig.projectId;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- UI Element References ---
         const statusMessageEl = document.getElementById('status-message');
@@ -256,21 +254,36 @@
         const loadingMessageEl = document.getElementById('loading-message');
         const authMessageEl = document.getElementById('auth-message');
 
+        let db, auth, userId;
         let allDrawings = [];
         let drawingToDeleteId = null;
 
         // --- Firebase Initialization and Auth ---
-        const initFirebase = () => {
+        const initFirebase = async () => {
             try {
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
+                await setupInitialAuth();
                 setupAuthListeners();
             } catch (error) {
                 loadingMessageEl.classList.add('hidden');
                 statusMessageEl.textContent = `Firebase init failed: ${error.message}`;
                 console.error("Firebase init failed:", error);
             }
+        };
+        
+        const setupInitialAuth = async () => {
+             if (initialAuthToken) {
+                 try {
+                     await signInWithCustomToken(auth, initialAuthToken);
+                 } catch (error) {
+                     console.error("Custom token sign-in failed, falling back to anonymous:", error);
+                     await signInAnonymously(auth);
+                 }
+             } else {
+                 await signInAnonymously(auth);
+             }
         };
 
         const setupAuthListeners = () => {
