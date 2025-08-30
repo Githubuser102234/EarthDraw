@@ -8,8 +8,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-    <!-- Font Awesome for icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -36,7 +34,6 @@
             top: 0;
             left: 0;
             z-index: 1000;
-            transition: all 0.2s;
         }
 
         .leaflet-container {
@@ -69,62 +66,10 @@
             width: 32px;
             height: 32px;
         }
-
-        #drawings-menu {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 300px;
-            height: 100vh;
-            background-color: #ffffff;
-            z-index: 2000;
-            transform: translateX(-100%);
-            transition: transform 0.3s ease-in-out;
-            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
-            padding: 1rem;
-            overflow-y: auto;
-        }
-
-        #drawings-menu.open {
-            transform: translateX(0);
-        }
-
-        #menu-toggle-btn {
-            position: fixed;
-            top: 1.5rem;
-            left: 1rem;
-            z-index: 2001;
-        }
-
-        .modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            z-index: 3000;
-        }
-
-        .modal-content {
-            background-color: white;
-            padding: 2rem;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-            max-width: 400px;
-            width: 90%;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 min-h-screen flex flex-col items-center">
 
-    <!-- Main Content -->
     <div class="max-w-4xl w-full mx-auto">
         <header class="text-center my-4">
             <h1 class="text-3xl font-bold text-gray-800">Interactive Drawing Map</h1>
@@ -133,9 +78,8 @@
 
         <!-- Login and App UI -->
         <div id="auth-container" class="flex flex-col items-center justify-center bg-white p-8 rounded-xl shadow-lg transition-all duration-300">
-            <p id="loading-message" class="text-lg text-gray-700 font-semibold mb-4">Loading application...</p>
-            <p id="auth-message" class="text-lg text-gray-700 font-semibold mb-4 hidden">Please sign in to start drawing.</p>
-            <button id="google-signin-button" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors hidden">
+            <p class="text-lg text-gray-700 font-semibold mb-4">Please sign in to start drawing.</p>
+            <button id="google-signin-button" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M21.002 10.25c.071.536.113 1.077.113 1.625 0 2.214-.658 4.288-1.928 5.864l-1.42-1.27c.805-1.047 1.272-2.39 1.272-3.662 0-.306-.027-.61-.077-.912H12.002v3.468h4.591c-.247 1.133-.873 2.112-1.803 2.766l1.247 1.054c1.174-.89 2.072-2.222 2.585-3.792C20.67 15.65 21.002 13.987 21.002 12.25c0-.668-.094-1.32-.236-1.932zM12.002 21.996c2.973 0 5.485-1.01 7.245-2.735l-1.247-1.054c-1.096.827-2.5 1.34-3.998 1.34-3.486 0-6.44-2.316-7.49-5.467h-3.94l-.001.001 1.487 3.655C6.44 19.845 8.956 21.996 12.002 21.996zM4.53 13.99c-.198-.53-.306-1.1-.306-1.69s.108-1.16.306-1.69L3.045 7.64c-.456.966-.715 2.064-.715 3.25s.259 2.284.715 3.25l1.485 3.65zM12.002 5.04c2.083 0 3.966.85 5.295 2.24l-1.745 1.54c-.933-.89-2.164-1.432-3.55-1.432-1.066 0-2.052.282-2.898.795l-1.474-3.66c1.238-.97 2.744-1.583 4.417-1.583z"/>
                 </svg>
@@ -178,52 +122,14 @@
             </div>
         </div>
     </div>
-    
-    <!-- Menu Toggle Button -->
-    <button id="menu-toggle-btn" class="bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors">
-        <i class="fas fa-bars"></i>
-    </button>
-    
-    <!-- Side Menu for Drawings -->
-    <div id="drawings-menu">
-        <h2 class="text-xl font-bold mb-4">Your Drawings</h2>
-        <ul id="drawings-list" class="space-y-2">
-            <!-- Drawings will be injected here -->
-        </ul>
-    </div>
-    
-    <!-- Modal for Saving Drawing Name -->
-    <div id="save-drawing-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3 class="text-lg font-bold">Name Your Drawing</h3>
-            <input type="text" id="drawing-name-input" placeholder="Enter drawing name..." class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-            <div class="flex space-x-2 justify-end">
-                <button id="save-drawing-modal-cancel" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-400">Cancel</button>
-                <button id="save-drawing-modal-save" class="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600">Save</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal for Deleting Drawing Confirmation -->
-    <div id="delete-drawing-modal" class="modal hidden">
-        <div class="modal-content">
-            <h3 class="text-lg font-bold">Confirm Deletion</h3>
-            <p>Are you sure you want to delete this drawing? This action cannot be undone.</p>
-            <div class="flex space-x-2 justify-end">
-                <button id="delete-drawing-modal-cancel" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-400">Cancel</button>
-                <button id="delete-drawing-modal-confirm" class="bg-red-500 text-white py-2 px-4 rounded-md hover:bg-red-600">Delete</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-    <!-- Firebase JS (using the older, stable version 11.6.1) -->
+    <!-- Firebase JS -->
     <script type="module">
-        // Import all necessary Firebase SDKs with the correct version
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut, signInWithCustomToken, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, deleteDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Set log level for debugging Firestore issues
@@ -239,9 +145,10 @@
             appId: "1:203683394694:web:95bec4420988a52c2b8d07",
             measurementId: "G-26GXSJGJSP"
         };
-        const appId = firebaseConfig.projectId;
+        const appId = "earthdraw-33c87"; // Using projectId as the app ID for firestore rules
 
-        // --- UI Element References ---
+        // --- Firebase Initialization and Auth ---
+        let db, auth, userId;
         const statusMessageEl = document.getElementById('status-message');
         const userIdEl = document.getElementById('user-id');
         const authContainer = document.getElementById('auth-container');
@@ -250,46 +157,23 @@
         const signOutButton = document.getElementById('sign-out-button');
         const userNameEl = document.getElementById('user-name');
         const userPhotoEl = document.getElementById('user-photo');
-        const loadingMessageEl = document.getElementById('loading-message');
-        const authMessageEl = document.getElementById('auth-message');
+        
+        let allDrawings = []; // Local array to hold all fetched drawings
 
-        let db, auth, userId;
-        let allDrawings = [];
-        let drawingToDeleteId = null;
-
-        // --- Firebase Initialization and Auth ---
-        const initFirebase = async () => {
+        const initFirebase = () => {
             try {
                 const app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
                 db = getFirestore(app);
-                
-                // Set up the listener first, then attempt to sign in.
+                auth = getAuth(app);
                 setupAuthListeners();
-                await setupInitialAuth();
             } catch (error) {
-                loadingMessageEl.classList.add('hidden');
                 statusMessageEl.textContent = `Firebase init failed: ${error.message}`;
                 console.error("Firebase init failed:", error);
-            }
-        };
-        
-        const setupInitialAuth = async () => {
-            if (typeof __initial_auth_token !== 'undefined') {
-                try {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } catch (error) {
-                    console.error("Custom token sign-in failed, falling back to anonymous:", error);
-                    await signInAnonymously(auth);
-                }
-            } else {
-                await signInAnonymously(auth);
             }
         };
 
         const setupAuthListeners = () => {
             onAuthStateChanged(auth, (user) => {
-                loadingMessageEl.classList.add('hidden');
                 if (user) {
                     userId = user.uid;
                     userIdEl.textContent = userId;
@@ -302,8 +186,6 @@
                 } else {
                     userId = null;
                     authContainer.classList.remove('hidden');
-                    authMessageEl.classList.remove('hidden');
-                    googleSignInButton.classList.remove('hidden');
                     mainApp.classList.add('hidden');
                     statusMessageEl.textContent = 'Please sign in to continue.';
                 }
@@ -420,7 +302,7 @@
             statusMessageEl.textContent = 'Canvas cleared.';
         });
 
-        document.getElementById('save-button').addEventListener('click', () => {
+        document.getElementById('save-button').addEventListener('click', async () => {
             if (points.length === 0) {
                 statusMessageEl.textContent = 'Draw something before saving!';
                 return;
@@ -429,24 +311,9 @@
                 statusMessageEl.textContent = 'You must be signed in to save.';
                 return;
             }
-            document.getElementById('save-drawing-modal').classList.remove('hidden');
-        });
 
-        document.getElementById('save-drawing-modal-cancel').addEventListener('click', () => {
-            document.getElementById('save-drawing-modal').classList.add('hidden');
-        });
-
-        document.getElementById('save-drawing-modal-save').addEventListener('click', async () => {
-            const drawingNameInput = document.getElementById('drawing-name-input');
-            const drawingName = drawingNameInput.value.trim();
-            if (!drawingName) {
-                statusMessageEl.textContent = 'Please enter a name for your drawing.';
-                return;
-            }
-            document.getElementById('save-drawing-modal').classList.add('hidden');
             statusMessageEl.textContent = 'Saving drawing...';
             const drawingData = {
-                name: drawingName,
                 points: JSON.stringify(points),
                 color: color,
                 createdAt: new Date()
@@ -456,7 +323,6 @@
                 await addDoc(collection(db, `artifacts/${appId}/users/${userId}/drawings`), drawingData);
                 statusMessageEl.textContent = 'Drawing saved successfully!';
                 clearLocalCanvas();
-                drawingNameInput.value = ''; // Clear input field
             } catch (e) {
                 console.error("Error saving document: ", e);
                 statusMessageEl.textContent = 'Error saving drawing. See console for details.';
@@ -476,49 +342,6 @@
                 statusMessageEl.textContent = 'Viewing mode enabled. Pan and zoom freely.';
                 canvas.style.pointerEvents = 'none'; // Disable pointer events on the canvas
             }
-        });
-
-        document.getElementById('menu-toggle-btn').addEventListener('click', () => {
-            document.getElementById('drawings-menu').classList.toggle('open');
-        });
-        
-        const goToDrawing = (drawingId) => {
-            const drawing = allDrawings.find(d => d.id === drawingId);
-            if (!drawing) return;
-
-            const drawingPoints = JSON.parse(drawing.points);
-            if (drawingPoints.length === 0) return;
-
-            // Calculate the center of the drawing
-            const latSum = drawingPoints.reduce((sum, p) => sum + p.lat, 0);
-            const lngSum = drawingPoints.reduce((sum, p) => sum + p.lng, 0);
-            const centerLat = latSum / drawingPoints.length;
-            const centerLng = lngSum / drawingPoints.length;
-
-            map.flyTo([centerLat, centerLng], 15, { duration: 1.5 });
-            document.getElementById('drawings-menu').classList.remove('open');
-            statusMessageEl.textContent = `Mapsd to drawing: ${drawing.name}`;
-        };
-
-        const deleteDrawing = async () => {
-            if (!drawingToDeleteId) return;
-
-            try {
-                await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/drawings`, drawingToDeleteId));
-                statusMessageEl.textContent = 'Drawing deleted successfully!';
-            } catch (e) {
-                console.error("Error deleting document: ", e);
-                statusMessageEl.textContent = 'Error deleting drawing. See console for details.';
-            } finally {
-                drawingToDeleteId = null;
-                document.getElementById('delete-drawing-modal').classList.add('hidden');
-            }
-        };
-        
-        document.getElementById('delete-drawing-modal-confirm').addEventListener('click', deleteDrawing);
-        document.getElementById('delete-drawing-modal-cancel').addEventListener('click', () => {
-            drawingToDeleteId = null;
-            document.getElementById('delete-drawing-modal').classList.add('hidden');
         });
 
         // --- Canvas and Firestore Sync ---
@@ -554,38 +377,6 @@
             }
         };
 
-        const renderDrawingsList = () => {
-            const drawingsListEl = document.getElementById('drawings-list');
-            drawingsListEl.innerHTML = '';
-            if (allDrawings.length === 0) {
-                drawingsListEl.innerHTML = '<p class="text-gray-500 text-sm">No drawings found. Start drawing and save your first one!</p>';
-                return;
-            }
-
-            allDrawings.forEach(drawing => {
-                const li = document.createElement('li');
-                li.className = 'flex items-center justify-between p-2 rounded-md hover:bg-gray-100 transition-colors cursor-pointer';
-                li.innerHTML = `
-                    <div class="flex items-center space-x-2 w-full" data-drawing-id="${drawing.id}">
-                        <i class="fas fa-map-pin text-gray-400"></i>
-                        <span class="text-sm font-medium text-gray-700 truncate">${drawing.name}</span>
-                    </div>
-                    <button class="text-gray-400 hover:text-red-500 p-1 rounded" data-delete-id="${drawing.id}" title="Delete Drawing">
-                        <i class="fas fa-trash"></i>
-                    </button>
-                `;
-                li.querySelector('div').addEventListener('click', (e) => {
-                    goToDrawing(e.currentTarget.dataset.drawingId);
-                });
-                li.querySelector('button').addEventListener('click', (e) => {
-                    drawingToDeleteId = e.currentTarget.dataset.deleteId;
-                    document.getElementById('delete-drawing-modal').classList.remove('hidden');
-                    e.stopPropagation(); // Prevent the parent 'go to' event from firing
-                });
-                drawingsListEl.appendChild(li);
-            });
-        };
-
         const loadDrawings = () => {
             if (!db || !userId) {
                 statusMessageEl.textContent = 'Waiting for user authentication...';
@@ -597,13 +388,11 @@
                 // Update local array with new data
                 allDrawings = [];
                 querySnapshot.forEach((doc) => {
-                    allDrawings.push({ id: doc.id, ...doc.data() });
+                    allDrawings.push(doc.data());
                 });
                 
                 // Redraw canvas with all current drawings
                 redrawAllDrawings();
-                // Re-render the side menu
-                renderDrawingsList();
                 
             }, (error) => {
                 console.error("Error getting documents:", error);
