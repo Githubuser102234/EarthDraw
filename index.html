@@ -8,6 +8,8 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
@@ -34,6 +36,7 @@
             top: 0;
             left: 0;
             z-index: 1000;
+            transition: all 0.2s;
         }
 
         .leaflet-container {
@@ -66,10 +69,57 @@
             width: 32px;
             height: 32px;
         }
+
+        #drawings-menu {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 300px;
+            height: 100vh;
+            background-color: #ffffff;
+            z-index: 2000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 2px 0 5px rgba(0, 0, 0, 0.2);
+            padding: 1rem;
+            overflow-y: auto;
+        }
+
+        #drawings-menu.open {
+            transform: translateX(0);
+        }
+
+        #menu-toggle-btn {
+            position: fixed;
+            top: 1.5rem;
+            left: 1rem;
+            z-index: 2001;
+        }
+
+        #save-drawing-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+        }
+
+        #save-drawing-modal-content {
+            background-color: white;
+            padding: 2rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
     </style>
 </head>
 <body class="bg-gray-100 p-4 min-h-screen flex flex-col items-center">
 
+    <!-- Main Content -->
     <div class="max-w-4xl w-full mx-auto">
         <header class="text-center my-4">
             <h1 class="text-3xl font-bold text-gray-800">Interactive Drawing Map</h1>
@@ -122,6 +172,31 @@
             </div>
         </div>
     </div>
+    
+    <!-- Menu Toggle Button -->
+    <button id="menu-toggle-btn" class="bg-blue-500 text-white p-3 rounded-full shadow-lg hover:bg-blue-600 transition-colors">
+        <i class="fas fa-bars"></i>
+    </button>
+    
+    <!-- Side Menu for Drawings -->
+    <div id="drawings-menu">
+        <h2 class="text-xl font-bold mb-4">Your Drawings</h2>
+        <ul id="drawings-list" class="space-y-2">
+            <!-- Drawings will be injected here -->
+        </ul>
+    </div>
+    
+    <!-- Modal for Saving Drawing Name -->
+    <div id="save-drawing-modal" class="hidden">
+        <div id="save-drawing-modal-content" class="flex flex-col space-y-4">
+            <h3 class="text-lg font-bold">Name Your Drawing</h3>
+            <input type="text" id="drawing-name-input" placeholder="Enter drawing name..." class="p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <div class="flex space-x-2">
+                <button id="save-drawing-modal-save" class="bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600">Save</button>
+                <button id="save-drawing-modal-cancel" class="bg-gray-300 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-400">Cancel</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
@@ -129,7 +204,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, deleteDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Set log level for debugging Firestore issues
@@ -145,7 +220,7 @@
             appId: "1:203683394694:web:95bec4420988a52c2b8d07",
             measurementId: "G-26GXSJGJSP"
         };
-        const appId = "earthdraw-33c87"; // Using projectId as the app ID for firestore rules
+        const appId = firebaseConfig.projectId;
 
         // --- Firebase Initialization and Auth ---
         let db, auth, userId;
@@ -302,7 +377,7 @@
             statusMessageEl.textContent = 'Canvas cleared.';
         });
 
-        document.getElementById('save-button').addEventListener('click', async () => {
+        document.getElementById('save-button').addEventListener('click', () => {
             if (points.length === 0) {
                 statusMessageEl.textContent = 'Draw something before saving!';
                 return;
@@ -311,9 +386,24 @@
                 statusMessageEl.textContent = 'You must be signed in to save.';
                 return;
             }
+            document.getElementById('save-drawing-modal').classList.remove('hidden');
+        });
 
+        document.getElementById('save-drawing-modal-cancel').addEventListener('click', () => {
+            document.getElementById('save-drawing-modal').classList.add('hidden');
+        });
+
+        document.getElementById('save-drawing-modal-save').addEventListener('click', async () => {
+            const drawingNameInput = document.getElementById('drawing-name-input');
+            const drawingName = drawingNameInput.value.trim();
+            if (!drawingName) {
+                statusMessageEl.textContent = 'Please enter a name for your drawing.';
+                return;
+            }
+            document.getElementById('save-drawing-modal').classList.add('hidden');
             statusMessageEl.textContent = 'Saving drawing...';
             const drawingData = {
+                name: drawingName,
                 points: JSON.stringify(points),
                 color: color,
                 createdAt: new Date()
@@ -323,6 +413,7 @@
                 await addDoc(collection(db, `artifacts/${appId}/users/${userId}/drawings`), drawingData);
                 statusMessageEl.textContent = 'Drawing saved successfully!';
                 clearLocalCanvas();
+                drawingNameInput.value = ''; // Clear input field
             } catch (e) {
                 console.error("Error saving document: ", e);
                 statusMessageEl.textContent = 'Error saving drawing. See console for details.';
@@ -343,6 +434,40 @@
                 canvas.style.pointerEvents = 'none'; // Disable pointer events on the canvas
             }
         });
+
+        document.getElementById('menu-toggle-btn').addEventListener('click', () => {
+            document.getElementById('drawings-menu').classList.toggle('open');
+        });
+        
+        const goToDrawing = (drawingId) => {
+            const drawing = allDrawings.find(d => d.id === drawingId);
+            if (!drawing) return;
+
+            const drawingPoints = JSON.parse(drawing.points);
+            if (drawingPoints.length === 0) return;
+
+            // Calculate the center of the drawing
+            const latSum = drawingPoints.reduce((sum, p) => sum + p.lat, 0);
+            const lngSum = drawingPoints.reduce((sum, p) => sum + p.lng, 0);
+            const centerLat = latSum / drawingPoints.length;
+            const centerLng = lngSum / drawingPoints.length;
+
+            map.flyTo([centerLat, centerLng], 15, { duration: 1.5 });
+            document.getElementById('drawings-menu').classList.remove('open');
+            statusMessageEl.textContent = `Mapsd to drawing: ${drawing.name}`;
+        };
+
+        const deleteDrawing = async (drawingId) => {
+            if (confirm("Are you sure you want to delete this drawing?")) {
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/drawings`, drawingId));
+                    statusMessageEl.textContent = 'Drawing deleted successfully!';
+                } catch (e) {
+                    console.error("Error deleting document: ", e);
+                    statusMessageEl.textContent = 'Error deleting drawing. See console for details.';
+                }
+            }
+        };
 
         // --- Canvas and Firestore Sync ---
         const clearLocalCanvas = () => {
@@ -377,6 +502,37 @@
             }
         };
 
+        const renderDrawingsList = () => {
+            const drawingsListEl = document.getElementById('drawings-list');
+            drawingsListEl.innerHTML = '';
+            if (allDrawings.length === 0) {
+                drawingsListEl.innerHTML = '<p class="text-gray-500 text-sm">No drawings found. Start drawing and save your first one!</p>';
+                return;
+            }
+
+            allDrawings.forEach(drawing => {
+                const li = document.createElement('li');
+                li.className = 'flex items-center justify-between p-2 rounded-md hover:bg-gray-100 transition-colors cursor-pointer';
+                li.innerHTML = `
+                    <div class="flex items-center space-x-2 w-full" data-drawing-id="${drawing.id}">
+                        <i class="fas fa-map-pin text-gray-400"></i>
+                        <span class="text-sm font-medium text-gray-700 truncate">${drawing.name}</span>
+                    </div>
+                    <button class="text-gray-400 hover:text-red-500 p-1 rounded" data-delete-id="${drawing.id}" title="Delete Drawing">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                `;
+                li.querySelector('div').addEventListener('click', (e) => {
+                    goToDrawing(e.currentTarget.dataset.drawingId);
+                });
+                li.querySelector('button').addEventListener('click', (e) => {
+                    deleteDrawing(e.currentTarget.dataset.deleteId);
+                    e.stopPropagation(); // Prevent the parent 'go to' event from firing
+                });
+                drawingsListEl.appendChild(li);
+            });
+        };
+
         const loadDrawings = () => {
             if (!db || !userId) {
                 statusMessageEl.textContent = 'Waiting for user authentication...';
@@ -388,11 +544,13 @@
                 // Update local array with new data
                 allDrawings = [];
                 querySnapshot.forEach((doc) => {
-                    allDrawings.push(doc.data());
+                    allDrawings.push({ id: doc.id, ...doc.data() });
                 });
                 
                 // Redraw canvas with all current drawings
                 redrawAllDrawings();
+                // Re-render the side menu
+                renderDrawingsList();
                 
             }, (error) => {
                 console.error("Error getting documents:", error);
