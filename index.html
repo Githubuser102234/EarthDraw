@@ -133,8 +133,9 @@
 
         <!-- Login and App UI -->
         <div id="auth-container" class="flex flex-col items-center justify-center bg-white p-8 rounded-xl shadow-lg transition-all duration-300">
-            <p class="text-lg text-gray-700 font-semibold mb-4">Please sign in to start drawing.</p>
-            <button id="google-signin-button" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors">
+            <p id="loading-message" class="text-lg text-gray-700 font-semibold mb-4">Loading application...</p>
+            <p id="auth-message" class="text-lg text-gray-700 font-semibold mb-4 hidden">Please sign in to start drawing.</p>
+            <button id="google-signin-button" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-full flex items-center space-x-2 hover:bg-blue-600 transition-colors hidden">
                 <svg class="w-5 h-5" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M21.002 10.25c.071.536.113 1.077.113 1.625 0 2.214-.658 4.288-1.928 5.864l-1.42-1.27c.805-1.047 1.272-2.39 1.272-3.662 0-.306-.027-.61-.077-.912H12.002v3.468h4.591c-.247 1.133-.873 2.112-1.803 2.766l1.247 1.054c1.174-.89 2.072-2.222 2.585-3.792C20.67 15.65 21.002 13.987 21.002 12.25c0-.668-.094-1.32-.236-1.932zM12.002 21.996c2.973 0 5.485-1.01 7.245-2.735l-1.247-1.054c-1.096.827-2.5 1.34-3.998 1.34-3.486 0-6.44-2.316-7.49-5.467h-3.94l-.001.001 1.487 3.655C6.44 19.845 8.956 21.996 12.002 21.996zM4.53 13.99c-.198-.53-.306-1.1-.306-1.69s.108-1.16.306-1.69L3.045 7.64c-.456.966-.715 2.064-.715 3.25s.259 2.284.715 3.25l1.485 3.65zM12.002 5.04c2.083 0 3.966.85 5.295 2.24l-1.745 1.54c-.933-.89-2.164-1.432-3.55-1.432-1.066 0-2.052.282-2.898.795l-1.474-3.66c1.238-.97 2.744-1.583 4.417-1.583z"/>
                 </svg>
@@ -219,6 +220,7 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <!-- Firebase JS -->
     <script type="module">
+        // Import Firebase SDKs with the correct version
         import { initializeApp } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-app.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-auth.js";
         import { getFirestore, doc, deleteDoc, collection, onSnapshot, query, addDoc } from "https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js";
@@ -237,10 +239,12 @@
             appId: "1:203683394694:web:95bec4420988a52c2b8d07",
             measurementId: "G-26GXSJGJSP"
         };
+
+        // Initialize variables that will hold Firebase service instances
+        let db, auth, userId;
         const appId = firebaseConfig.projectId;
 
-        // --- Firebase Initialization and Auth ---
-        let db, auth, userId;
+        // --- UI Element References ---
         const statusMessageEl = document.getElementById('status-message');
         const userIdEl = document.getElementById('user-id');
         const authContainer = document.getElementById('auth-container');
@@ -249,17 +253,21 @@
         const signOutButton = document.getElementById('sign-out-button');
         const userNameEl = document.getElementById('user-name');
         const userPhotoEl = document.getElementById('user-photo');
-        
-        let allDrawings = []; // Local array to hold all fetched drawings
-        let drawingToDeleteId = null; // Store ID for delete confirmation
+        const loadingMessageEl = document.getElementById('loading-message');
+        const authMessageEl = document.getElementById('auth-message');
 
+        let allDrawings = [];
+        let drawingToDeleteId = null;
+
+        // --- Firebase Initialization and Auth ---
         const initFirebase = () => {
             try {
                 const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
                 auth = getAuth(app);
+                db = getFirestore(app);
                 setupAuthListeners();
             } catch (error) {
+                loadingMessageEl.classList.add('hidden');
                 statusMessageEl.textContent = `Firebase init failed: ${error.message}`;
                 console.error("Firebase init failed:", error);
             }
@@ -267,6 +275,7 @@
 
         const setupAuthListeners = () => {
             onAuthStateChanged(auth, (user) => {
+                loadingMessageEl.classList.add('hidden');
                 if (user) {
                     userId = user.uid;
                     userIdEl.textContent = userId;
@@ -279,6 +288,8 @@
                 } else {
                     userId = null;
                     authContainer.classList.remove('hidden');
+                    authMessageEl.classList.remove('hidden');
+                    googleSignInButton.classList.remove('hidden');
                     mainApp.classList.add('hidden');
                     statusMessageEl.textContent = 'Please sign in to continue.';
                 }
