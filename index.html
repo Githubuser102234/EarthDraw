@@ -240,7 +240,6 @@
             measurementId: "G-26GXSJGJSP"
         };
         const appId = firebaseConfig.projectId;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
         // --- UI Element References ---
         const statusMessageEl = document.getElementById('status-message');
@@ -264,8 +263,10 @@
                 const app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
-                await setupInitialAuth();
+                
+                // Set up the listener first, then attempt to sign in.
                 setupAuthListeners();
+                await setupInitialAuth();
             } catch (error) {
                 loadingMessageEl.classList.add('hidden');
                 statusMessageEl.textContent = `Firebase init failed: ${error.message}`;
@@ -274,16 +275,16 @@
         };
         
         const setupInitialAuth = async () => {
-             if (initialAuthToken) {
-                 try {
-                     await signInWithCustomToken(auth, initialAuthToken);
-                 } catch (error) {
-                     console.error("Custom token sign-in failed, falling back to anonymous:", error);
-                     await signInAnonymously(auth);
-                 }
-             } else {
-                 await signInAnonymously(auth);
-             }
+            if (typeof __initial_auth_token !== 'undefined') {
+                try {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } catch (error) {
+                    console.error("Custom token sign-in failed, falling back to anonymous:", error);
+                    await signInAnonymously(auth);
+                }
+            } else {
+                await signInAnonymously(auth);
+            }
         };
 
         const setupAuthListeners = () => {
